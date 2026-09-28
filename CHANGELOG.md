@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.7] - 2026-09-28
+
+### Fixed
+
+- Fixed IP toggle now pins `127.0.0.1` in No-WiFi mode (no hotspot) instead of
+  showing the general remote IP (`10.x.x.x` / carrier-NAT). Hotspot mode still
+  pins `192.168.49.1`.
+
 ## [1.2.0] - 2026-07-10
 
 ### Added

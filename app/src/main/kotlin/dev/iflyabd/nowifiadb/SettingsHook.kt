@@ -123,14 +123,18 @@ object SettingsHook {
                             XposedHelpers.getObjectField(param.thisObject, "mContext") as? Context
                                 ?: return
                         if (!HotspotHelper.isBypassActive(context)) return
+                        if (HotspotHelper.isFixedIpEnabled(context)) {
+                            // Fixed IP ON: always pin a stable loopback-safe address.
+                            // No hotspot (No-WiFi mode) -> 127.0.0.1, never the
+                            // carrier-NAT / general remote IP (10.x, etc).
+                            // Hotspot up -> 192.168.49.1 alias.
+                            param.result = HotspotHelper.getEffectiveFixedIp(context)
+                            return
+                        }
                         if (!HotspotHelper.isHotspotActive(context)) {
                             // No-WiFi mode without hotspot: show any device IP so the
                             // pairing screen has something usable (e.g. Tailscale IP).
                             HotspotHelper.getAnyDeviceIp()?.let { param.result = it }
-                            return
-                        }
-                        if (HotspotHelper.isFixedIpEnabled(context)) {
-                            param.result = HotspotHelper.getEffectiveFixedIp(context)
                             return
                         }
                         val ip = HotspotHelper.getHotspotIpAddress(context) ?: return
@@ -361,7 +365,8 @@ object SettingsHook {
     }
 
     /** Two independent switches on the Wireless Debugging screen: Fixed IP
-     *  (always use 192.168.49.1) and Fixed port (always use 5555). */
+     *  (127.0.0.1 without hotspot, 192.168.49.1 with hotspot) and Fixed port
+     *  (always use 5555). */
     private fun injectFixedSwitchesPref(
         fragment: Any,
         lpparam: XC_LoadPackage.LoadPackageParam,
@@ -381,7 +386,7 @@ object SettingsHook {
             context,
             HotspotHelper.FIXED_IP_KEY,
             "Fixed IP",
-            "Pin a stable IP (hotspot alias, else loopback)",
+            "Pin 127.0.0.1 (no hotspot) / 192.168.49.1 (hotspot)",
             HotspotHelper.isFixedIpEnabled(context),
         )?.let { added += it }
         addFixedSwitch(

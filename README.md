@@ -9,7 +9,7 @@ hotspot** — e.g. over mobile data or Tailscale — plus an optional
 ## Download
 
 Get the APK from [Releases](https://github.com/iflyabd/nowifi-adb/releases) —
-no login needed. Latest is **v1.0.2** (stable-signed; all future updates install
+no login needed. Latest is **v1.1.7** (stable-signed; all future updates install
 cleanly over it).
 
 ## Requirements
@@ -79,6 +79,8 @@ Notes:
 - The mobile-data IP shown (e.g. `10.x.x.x`) is carrier-NAT: reachable from the
   phone itself, generally **not** from a PC. For PC access use your Tailscale IP
   (phone and PC on the same tailnet) or turn on the hotspot and use its IP.
+- Enable **Fixed IP** to pin `127.0.0.1` instead of the mobile-data IP for
+  stable on-device `adb connect 127.0.0.1:<port>` use.
 - Turning **No-WiFi mode** back OFF restores completely stock behavior.
 
 ## Start on boot (optional)
@@ -99,10 +101,12 @@ against late boot events (adbd restarts, network flips). Otherwise boot stays cl
 2. Use the **Wireless debugging** toggle in hotspot settings or Developer options.
 3. Pair once (`adb pair <hotspot-ip>:<pairing-port>`), then
    `adb connect <hotspot-ip>:<port>`.
-4. Optional: enable **Fixed IP** (always show `192.168.49.1`) and/or
+4. Optional: enable **Fixed IP** (always show `192.168.49.1` with hotspot,
+    `127.0.0.1` without) and/or
    **Fixed port** (always use `5555` via a system_server TCP proxy, TLS
-   preserved end-to-end) on the Wireless Debugging screen. Both need the
-   hotspot up to take effect; pairing still uses the one-time dynamic port.
+    preserved end-to-end) on the Wireless Debugging screen. Fixed port works
+    without hotspot; Fixed IP needs no hotspot either (`127.0.0.1`) but shows
+    `192.168.49.1` when the hotspot is up; pairing still uses the one-time dynamic port.
 
 ## Building from source
 
