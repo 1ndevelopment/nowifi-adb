@@ -9,30 +9,37 @@ hotspot** — e.g. over mobile data or Tailscale — plus an optional
 ## Download
 
 Get the APK from [Releases](https://github.com/iflyabd/nowifi-adb/releases) —
-no login needed. Latest is **v1.1.7** (stable-signed; all future updates install
+no login needed. Latest is **v1.1.8** (stable-signed; all future updates install
 cleanly over it).
 
 ## Requirements
 
 - Android 15–16 (minSdk 33, targetSdk 36)
-- Root with Magisk (26+) and **Zygisk enabled**
+- Root with **KernelSU** (or KernelSU-Next) and **Zygisk Next** — KernelSU has no
+  built-in Zygisk, so flash the Zygisk Next ZIP in the KernelSU manager first.
+  (Magisk 26+ with its built-in **Zygisk** works too; the module itself is
+  root-agnostic — it is a plain LSPosed module APK, not a root module ZIP.)
 - LSPosed framework, legacy-Xposed-API build — **LSPosed 1.x**
   (tested: v1.11.0 zygisk-release). v1.3.0-style builds targeting API 101 need
   LSPosed 2.x/Vector instead and will **not** load here.
 
-Tested on: OnePlus CPH2487, Android 16, Magisk 30.7, LSPosed v1.11.0.
+Tested on: OnePlus CPH2487, Android 16, LSPosed v1.11.0 — KernelSU 1.x /
+Zygisk Next; also Magisk 30.7.
 
 ## Installation
 
-1. Install LSPosed first (flash the zygisk release ZIP in Magisk → Modules,
-   reboot, install the LSPosed manager APK if it isn't installed automatically).
-2. Install the `app-release.apk` from Releases normally (tap the file → Install).
-3. Open the **LSPosed** manager app → **Modules** → enable
+1. Install **Zygisk Next** first: KernelSU manager → **Modules** → install the
+   Zygisk Next ZIP → reboot. (On Magisk, skip this and just enable the built-in
+   **Zygisk** toggle in Magisk settings.)
+2. Install **LSPosed** (flash the zygisk-release ZIP the same way) → reboot,
+   then install the LSPosed manager APK if it isn't installed automatically.
+3. Install the `app-release.apk` from Releases normally (tap the file → Install).
+4. Open the **LSPosed** manager app → **Modules** → enable
    **NoWiFi Wireless Debugging**.
-4. Open its **Scope** and tick both:
+5. Open its **Scope** and tick both:
    - **System Framework** (`system`)
    - **Settings** (`com.android.settings`)
-5. **Reboot.** (Zygote must restart to load the module.)
+6. **Reboot.** (Zygote must restart to load the module.)
 
 How to confirm it loaded: in a root shell, check the LSPosed log —
 
@@ -41,7 +48,8 @@ su -c 'grep NoWifiAdb /data/adb/lspd/log/modules_*.log | head'
 ```
 
 You should see `Loading legacy module dev.iflyabd.nowifiadb`,
-`hooking framework` and `hooking Settings` with no `failed` lines.
+`hooking framework`, `hooking Settings`, and `hooked N verifyWifiNetwork
+overload(s)`, with no `failed` lines.
 
 > Coming from the v1.0.0 debug build? Uninstall it first — v1.0.0 was signed
 > with a throwaway debug key, so installing v1.0.2 over it fails with
@@ -123,6 +131,7 @@ make build    # ./gradlew assembleDebug (needs JDK 21 + Android SDK)
 | Symptom | Fix |
 |---|---|
 | Main toggle still says “no network” | No-WiFi mode is OFF, or module/scopes not enabled, or you skipped the reboot after enabling |
+| Main toggle turns ON then flips back OFF | Module/scopes aren’t active, so the framework’s untrusted-network deny (`ADB_WIFI_ENABLED=0`) isn’t blocked. Check the LSPosed log for `hooked N verifyWifiNetwork overload(s)` or `arming adb_wifi_enabled guard`; if neither appears, re-enable the module with both scopes and reboot |
 | `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | Uninstall the old debug-signed build first (see note above), then install |
 | `NoSuchMethodException … HotspotAdbModule` in LSPosed log | Wrong module build for your framework (API-101 builds need LSPosed 2.x/Vector). Use this repo's releases (legacy API) with LSPosed 1.x |
 | `adb connect` fails to shown mobile IP | Normal on carrier NAT — use `127.0.0.1:<port>` on-device, or Tailscale/hotspot IP remotely |

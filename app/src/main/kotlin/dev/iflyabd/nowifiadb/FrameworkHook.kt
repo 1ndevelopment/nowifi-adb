@@ -21,6 +21,9 @@ object FrameworkHook {
     @Volatile
     private var observersRegistered = false
 
+    @Volatile
+    private var adbWifiGuardInstalled = false
+
     fun init(lpparam: XC_LoadPackage.LoadPackageParam) {
         SubnetAlias.setClassLoader(lpparam.classLoader)
         startOnBootWatcher(lpparam)
@@ -98,29 +101,46 @@ object FrameworkHook {
      * isn't trusted. Our synthetic hotspot BSSID is never trusted, so treat the hotspot
      * as trusted while it is active. Absent on older versions (hook install no-ops).
      *
-     * Must run in beforeHookedMethod: the original body calls startConfirmationForNetwork()
-     * for untrusted networks, which launches SystemUI's WifiDebuggingActivity and then
-     * writes ADB_WIFI_ENABLED=0 (deny), flapping the toggle. Returning early skips it.
+     * The exact signature drifts across OEM builds (Samsung adds/renames overloads), so
+     * hook every overload by name rather than one exact signature. Must run in
+     * beforeHookedMethod: the original body calls startConfirmationForNetwork() for
+     * untrusted networks, which launches SystemUI's WifiDebuggingActivity and then writes
+     * ADB_WIFI_ENABLED=0 (deny), flapping the toggle. Returning early skips it.
+     *
+     * If no overload exists at all, arm the adb_wifi_enabled guard so the deny write is
+     * blocked regardless of which code path performs it.
      */
     private fun hookVerifyWifiNetwork(lpparam: XC_LoadPackage.LoadPackageParam) {
-        try {
-            val handlerClass = AdbFrameworkRefs.findHandlerClass(lpparam.classLoader)
-            XposedHelpers.findAndHookMethod(
-                handlerClass,
-                "verifyWifiNetwork",
-                String::class.java,
-                String::class.java,
-                object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val context = getContext(param.thisObject) ?: return
-                        if (!HotspotHelper.isBypassActive(context)) return
+        val handlerClass =
+            try {
+                AdbFrameworkRefs.findHandlerClass(lpparam.classLoader)
+            } catch (e: Throwable) {
+                XposedBridge.log("NoWifiAdb: AdbDebuggingHandler not found: $e")
+                ensureAdbWifiDisableGuard(lpparam)
+                return
+            }
+        val hook =
+            object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val context = getContext(param.thisObject) ?: return
+                    if (!HotspotHelper.isBypassActive(context)) return
+                    // Boolean overload: report the network as trusted. Any other shape
+                    // (e.g. void): skip the body so the deny write never happens.
+                    if ((param.method as java.lang.reflect.Method).returnType == java.lang.Boolean.TYPE) {
                         param.result = true
-                        XposedBridge.log("NoWifiAdb: verifyWifiNetwork -> true (hotspot active)")
+                        XposedBridge.log("NoWifiAdb: verifyWifiNetwork(${param.args.size} args) -> true (bypass active)")
+                    } else {
+                        param.result = null
+                        XposedBridge.log("NoWifiAdb: verifyWifiNetwork(${param.args.size} args) skipped (bypass active)")
                     }
-                },
-            )
-        } catch (e: Throwable) {
-            XposedBridge.log("NoWifiAdb: failed to hook verifyWifiNetwork: $e")
+                }
+            }
+        val unhooks = XposedBridge.hookAllMethods(handlerClass, "verifyWifiNetwork", hook)
+        if (unhooks.isEmpty()) {
+            XposedBridge.log("NoWifiAdb: no verifyWifiNetwork on this ROM; arming adb_wifi_enabled guard")
+            ensureAdbWifiDisableGuard(lpparam)
+        } else {
+            XposedBridge.log("NoWifiAdb: hooked ${unhooks.size} verifyWifiNetwork overload(s)")
         }
     }
 
@@ -225,7 +245,7 @@ object FrameworkHook {
         val cls = AdbFrameworkRefs.resolveBroadcastReceiverClass(lpparam.classLoader)
         if (cls == null) {
             XposedBridge.log("NoWifiAdb: BroadcastReceiver not found, falling back to ContentResolver hook")
-            hookSettingsGlobalDisable(lpparam)
+            ensureAdbWifiDisableGuard(lpparam)
             return
         }
         try {
@@ -265,8 +285,24 @@ object FrameworkHook {
         )
     }
 
+    /**
+     * Safety net (idempotent): blocks any write of adb_wifi_enabled=0 in system_server
+     * while the bypass is active, regardless of which ROM code path performs it.
+     *
+     * Trade-off: while the bypass is on (hotspot up or No-WiFi mode on) the user can't
+     * turn wireless debugging off from the toggle; turn the hotspot / No-WiFi mode off
+     * first. That's the documented way back to stock behavior.
+     */
+    private fun ensureAdbWifiDisableGuard(lpparam: XC_LoadPackage.LoadPackageParam) {
+        synchronized(this) {
+            if (adbWifiGuardInstalled) return
+            hookSettingsGlobalDisable(lpparam)
+            adbWifiGuardInstalled = true
+        }
+    }
+
     private fun hookSettingsGlobalDisable(lpparam: XC_LoadPackage.LoadPackageParam) {
-        // Fallback: intercept Settings.Global.putInt to prevent ADB_WIFI_ENABLED = 0 when hotspot is active
+        // Fallback: intercept Settings.Global.putInt to prevent ADB_WIFI_ENABLED = 0 when bypass active
         try {
             XposedHelpers.findAndHookMethod(
                 "android.provider.Settings\$Global",
