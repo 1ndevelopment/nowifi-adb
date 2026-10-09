@@ -140,8 +140,7 @@ make build    # ./gradlew assembleDebug (needs JDK 21 + Android SDK)
 ## Other solutions
 
 - [Magisk nowifi-adb fork](https://github.com/iflyabd/nowifi-adb)
-- [Hotspot Wireless Debugging](https://github.com/droserasprout/io.drsr.hotspotadb)
-  (upstream of this fork — hotspot only)
+  (upstream of this fork)
 - [Magisk-WiFiADB](https://github.com/mrh929/magisk-wifiadb) — legacy unencrypted
   `adb tcpip` on boot, Magisk only, no LSPosed needed
 
