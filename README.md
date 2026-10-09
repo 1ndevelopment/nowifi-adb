@@ -8,7 +8,7 @@ hotspot** — e.g. over mobile data or Tailscale — plus an optional
 
 ## Download
 
-Get the APK from [Releases](https://github.com/iflyabd/nowifi-adb/releases) —
+Get the APK from [Releases](https://github.com/1ndevelopment/ksu-nowifi-adb/releases) —
 no login needed. Latest is **v1.1.8** (stable-signed; all future updates install
 cleanly over it).
 
@@ -139,6 +139,7 @@ make build    # ./gradlew assembleDebug (needs JDK 21 + Android SDK)
 
 ## Other solutions
 
+- [Magisk nowifi-adb fork](https://github.com/iflyabd/nowifi-adb)
 - [Hotspot Wireless Debugging](https://github.com/droserasprout/io.drsr.hotspotadb)
   (upstream of this fork — hotspot only)
 - [Magisk-WiFiADB](https://github.com/mrh929/magisk-wifiadb) — legacy unencrypted
